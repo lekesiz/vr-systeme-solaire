@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VoyageVR — Atelier d'apprentissage du Système Solaire</title>
+  <meta name="description" content="Situation problème UE 6.2.3 — Application VR pédagogique A-Frame : Observation, Déplacement, Interaction.">
+  <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; font-family: system-ui, Arial, sans-serif; }
+
+    /* --- Panneau d'analyse de l'apprentissage (HUD 2D superposé) --- */
+    #hud {
+      position: fixed; top: 12px; left: 12px; z-index: 9999;
+      background: rgba(12, 18, 38, 0.82); color: #eaf0ff;
+      padding: 14px 16px; border-radius: 12px; width: 250px;
+      box-shadow: 0 6px 24px rgba(0,0,0,.45); backdrop-filter: blur(4px);
+      font-size: 13px; line-height: 1.5;
+    }
+    #hud h1 { font-size: 14px; margin: 0 0 8px; color: #7cc7ff; letter-spacing: .3px; }
+    #hud .row { display: flex; justify-content: space-between; margin: 3px 0; }
+    #hud .row b { color: #ffd479; }
+    #hud .bar { height: 7px; background: #2a3457; border-radius: 5px; margin-top: 6px; overflow: hidden; }
+    #hud .bar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg,#41d18f,#7cc7ff); transition: width .4s; }
+    #hud .hint { margin-top: 10px; font-size: 11px; color: #9fb0d8; }
+    #help {
+      position: fixed; bottom: 12px; left: 12px; z-index: 9999;
+      background: rgba(12, 18, 38, 0.82); color: #cdd8f5;
+      padding: 8px 12px; border-radius: 10px; font-size: 11.5px; max-width: 300px;
+    }
+    #help b { color: #7cc7ff; }
+  </style>
+</head>
+<body>
+
+  <!-- ===================== HUD : ANALYSE DE L'IMPACT DES ACTIONS ===================== -->
+  <!-- Répond à l'objectif de la situation problème : "analyser l'impact de certaines
+       actions des utilisateurs dans un monde virtuel sur leur apprentissage". -->
+  <div id="hud">
+    <h1>📊 Tableau de bord pédagogique</h1>
+    <div class="row"><span>👁️ Planètes observées</span><b id="m-obs">0 / 5</b></div>
+    <div class="row"><span>🧭 Téléportations</span><b id="m-move">0</b></div>
+    <div class="row"><span>🖐️ Interactions</span><b id="m-int">0</b></div>
+    <div class="row"><span>🎯 Score quiz</span><b id="m-quiz">0 / 5</b></div>
+    <div class="bar"><i id="m-progress"></i></div>
+    <div class="hint">Progression d'apprentissage estimée à partir des actions réalisées.</div>
+  </div>
+
+  <div id="help">
+    <b>Desktop :</b> Z/Q/S/D ou flèches pour marcher · souris pour regarder ·
+    cliquez les <b>anneaux verts</b> pour vous téléporter · cliquez une <b>planète</b> pour l'étudier.
+    <br><b>Casque VR :</b> bouton « VR » en bas à droite.
+  </div>
+
+  <!-- ===================== SCÈNE 3D / VR ===================== -->
+  <a-scene background="color: #05060f" renderer="colorManagement: true; antialias: true">
+
+    <a-assets>
+      <!-- Dégradé de ciel étoilé généré par mixin couleur (aucune dépendance externe) -->
+      <a-mixin id="planet-label"
+               text="align: center; width: 4; color: #ffffff; baseline: bottom"></a-mixin>
+    </a-assets>
+
+    <!-- Lumières -->
+    <a-light type="ambient" color="#41507a" intensity="0.6"></a-light>
+    <a-light type="point" color="#fff3d6" intensity="1.4" position="0 6 0"></a-light>
+
+    <!-- Sol / navmesh visuel : sert de repère et porte les pads de téléportation -->
+    <a-circle radius="22" rotation="-90 0 0" position="0 0 0"
+              material="color: #11183a; metalness:0.1; roughness:0.95"
+              shadow="receive: true"></a-circle>
+
+    <!-- Champ d'étoiles simple (points lumineux) -->
+    <a-entity id="starfield"></a-entity>
+
+    <!-- =============== SOLEIL (centre, animé) =============== -->
+    <a-sphere position="0 3.2 0" radius="1.6"
+              material="color:#ffb13b; emissive:#ff8a00; emissiveIntensity:0.9"
+              animation="property: rotation; to: 0 360 0; loop: true; dur: 22000; easing: linear">
+      <a-text value="LE SOLEIL" align="center" position="0 2.2 0" width="8" color="#ffd479"></a-text>
+    </a-sphere>
+
+    <!-- =============== 5 STATIONS-PLANÈTES =============== -->
+    <!-- Chaque planète = sphère animée + panneau d'info (Observation) + clic (Interaction).
+         Chaque pad-anneau = Déplacement (téléportation). -->
+
+    <!-- MERCURE -->
+    <a-entity position="-9 0 -2">
+      <a-ring class="teleport-pad" teleport-pad rotation="-90 0 0" position="0 0.02 3"
+              radius-inner="0.7" radius-outer="1.0" material="color:#41d18f; opacity:0.85; side:double"></a-ring>
+      <a-sphere class="planet clickable" radius="0.7" position="0 1.6 0"
+                material="color:#b8b1a8; roughness:1"
+                animation="property: rotation; to: 0 360 0; loop: true; dur: 16000; easing: linear"
+                data-name="Mercure"
+                data-fact="Mercure est la planète la plus proche du Soleil et la plus petite du système solaire. Une année n'y dure que 88 jours terrestres.">
+      </a-sphere>
+      <a-text value="MERCURE" align="center" position="0 2.7 0" width="6" color="#eaf0ff"></a-text>
+    </a-entity>
+
+    <!-- VÉNUS -->
+    <a-entity position="-4.5 0 -8">
+      <a-ring class="teleport-pad" teleport-pad rotation="-90 0 0" position="0 0.02 3"
+              radius-inner="0.7" radius-outer="1.0" material="color:#41d18f; opacity:0.85; side:double"></a-ring>
+      <a-sphere class="planet clickable" radius="0.95" position="0 1.7 0"
+                material="color:#e8b06a; roughness:0.9"
+                animation="property: rotation; to: 0 360 0; loop: true; dur: 20000; easing: linear"
+                data-name="Vénus"
+                data-fact="Vénus est la planète la plus chaude (plus de 460 °C) à cause d'un effet de serre extrême. Elle tourne sur elle-même dans le sens inverse des autres planètes.">
+      </a-sphere>
+      <a-text value="VÉNUS" align="center" position="0 3.0 0" width="6" color="#eaf0ff"></a-text>
+    </a-entity>
+
+    <!-- TERRE -->
+    <a-entity position="4.5 0 -8">
+      <a-ring class="teleport-pad" teleport-pad rotation="-90 0 0" position="0 0.02 3"
+              radius-inner="0.7" radius-outer="1.0" material="color:#41d18f; opacity:0.85; side:double"></a-ring>
+      <a-sphere class="planet clickable" radius="1.0" position="0 1.8 0"
+                material="color:#3d7bd1; roughness:0.85"
+                animation="property: rotation; to: 0 360 0; loop: true; dur: 18000; easing: linear"
+                data-name="La Terre"
+                data-fact="La Terre est la seule planète connue abritant la vie. 71 % de sa surface est couverte d'eau liquide, indispensable aux organismes vivants.">
+        <!-- Petite lune en orbite : montre l'animation de translation -->
+        <a-entity animation="property: rotation; to: 0 360 0; loop: true; dur: 6000; easing: linear">
+          <a-sphere radius="0.22" position="1.7 0 0" material="color:#cfd3da"></a-sphere>
+        </a-entity>
+      </a-sphere>
+      <a-text value="LA TERRE" align="center" position="0 3.1 0" width="6" color="#eaf0ff"></a-text>
+    </a-entity>
+
+    <!-- MARS -->
+    <a-entity position="9 0 -2">
+      <a-ring class="teleport-pad" teleport-pad rotation="-90 0 0" position="0 0.02 3"
+              radius-inner="0.7" radius-outer="1.0" material="color:#41d18f; opacity:0.85; side:double"></a-ring>
+      <a-sphere class="planet clickable" radius="0.85" position="0 1.7 0"
+                material="color:#c1440e; roughness:0.95"
+                animation="property: rotation; to: 0 360 0; loop: true; dur: 17000; easing: linear"
+                data-name="Mars"
+                data-fact="Mars, la « planète rouge », doit sa couleur à l'oxyde de fer. Elle abrite Olympus Mons, le plus haut volcan du système solaire (environ 22 km).">
+      </a-sphere>
+      <a-text value="MARS" align="center" position="0 2.9 0" width="6" color="#eaf0ff"></a-text>
+    </a-entity>
+
+    <!-- JUPITER -->
+    <a-entity position="0 0 -13">
+      <a-ring class="teleport-pad" teleport-pad rotation="-90 0 0" position="0 0.02 3.5"
+              radius-inner="0.7" radius-outer="1.0" material="color:#41d18f; opacity:0.85; side:double"></a-ring>
+      <a-sphere class="planet clickable" radius="1.5" position="0 2.2 0"
+                material="color:#c8a06a; roughness:0.8"
+                animation="property: rotation; to: 0 360 0; loop: true; dur: 14000; easing: linear"
+                data-name="Jupiter"
+                data-fact="Jupiter est la plus grande planète : plus de 1300 Terres tiendraient à l'intérieur. Sa Grande Tache Rouge est une tempête géante vieille de plusieurs siècles.">
+      </a-sphere>
+      <a-text value="JUPITER" align="center" position="0 4.1 0" width="7" color="#eaf0ff"></a-text>
+    </a-entity>
+
+    <!-- =============== PANNEAU D'INFORMATION (Observation détaillée) =============== -->
+    <a-entity id="infoPanel" position="0 2.3 -3.2" visible="false">
+      <a-plane width="3.4" height="1.9" material="color:#0b1230; opacity:0.94; side:double"></a-plane>
+      <a-text id="infoTitle" value="" align="center" position="0 0.62 0.01" width="3.1" color="#7cc7ff"></a-text>
+      <a-text id="infoBody"  value="" align="center" position="0 -0.05 0.01" width="3.0" color="#eaf0ff"
+              wrap-count="34"></a-text>
+      <a-text value="(regardez ailleurs pour fermer)" align="center" position="0 -0.78 0.01"
+              width="2.6" color="#6e7ba6"></a-text>
+    </a-entity>
+
+    <!-- =============== KIOSQUE QUIZ (Interaction évaluative) =============== -->
+    <a-entity id="quizKiosk" position="0 0 4.5">
+      <a-box depth="0.3" height="1.2" width="2.6" position="0 1.2 0" material="color:#1b2750"></a-box>
+      <a-text id="quizText" value="QUIZ\nÉtudiez d'abord les 5 planètes,\npuis cliquez ici pour démarrer."
+              align="center" position="0 1.4 0.17" width="2.4" color="#ffd479" wrap-count="30"></a-text>
+      <a-box id="quizBtn" class="clickable" quiz-control position="0 0.55 0.2"
+             depth="0.15" height="0.32" width="1.4" material="color:#41d18f"></a-box>
+      <a-text value="DÉMARRER / RÉPONDRE" align="center" position="0 0.55 0.3" width="2" color="#06210f"></a-text>
+    </a-entity>
+
+    <!-- =============== RIG JOUEUR + CAMÉRA + CURSEUR =============== -->
+    <a-entity id="rig" position="0 0 6" movement-controls="speed: 0.22; fly: false">
+      <a-camera look-controls="pointerLockEnabled: false" wasd-controls="enabled: false" position="0 1.6 0">
+        <!-- Curseur central : fonctionne au regard (VR) ET au clic souris (desktop) -->
+        <a-cursor color="#7cc7ff" raycaster="objects: .clickable, .teleport-pad; far: 30"
+                  fuse="false"
+                  animation__click="property: scale; startEvents: click; from: 0.1 0.1 0.1; to: 1 1 1; dur: 200"></a-cursor>
+      </a-camera>
+    </a-entity>
+
+    <!-- Curseur souris additionnel (clic direct desktop sans viser au centre) -->
+    <a-entity id="mouseCursor" cursor="rayOrigin: mouse" raycaster="objects: .clickable, .teleport-pad; far: 30"></a-entity>
+
+  </a-scene>
+
+  <!-- ===================== LOGIQUE / COMPOSANTS A-FRAME ===================== -->
+  <script>
+    /* État global d'apprentissage = base de l'analyse d'impact */
+    const learning = {
+      observed: new Set(),   // planètes réellement étudiées (Observation)
+      moves: 0,              // déplacements (Déplacement)
+      interactions: 0,       // clics d'interaction (Interaction)
+      quizScore: 0,
+      quizTotal: 5
+    };
+
+    function refreshHUD() {
+      document.getElementById('m-obs').textContent  = learning.observed.size + ' / 5';
+      document.getElementById('m-move').textContent = learning.moves;
+      document.getElementById('m-int').textContent  = learning.interactions;
+      document.getElementById('m-quiz').textContent = learning.quizScore + ' / ' + learning.quizTotal;
+      // Score d'apprentissage composite (observation 50 %, quiz 50 %)
+      const pct = Math.round((learning.observed.size / 5) * 50 + (learning.quizScore / learning.quizTotal) * 50);
+      document.getElementById('m-progress').style.width = pct + '%';
+    }
+
+    /* ---- Composant : pad de téléportation (Déplacement) ---- */
+    AFRAME.registerComponent('teleport-pad', {
+      init: function () {
+        const el = this.el;
+        const handler = () => {
+          const worldPos = new THREE.Vector3();
+          el.object3D.getWorldPosition(worldPos);
+          const rig = document.getElementById('rig');
+          // On garde la hauteur du rig (0) et on se place sur le pad
+          rig.setAttribute('position', { x: worldPos.x, y: 0, z: worldPos.z });
+          learning.moves++;
+          refreshHUD();
+          // petit retour visuel
+          el.setAttribute('material', 'color', '#ffd479');
+          setTimeout(() => el.setAttribute('material', 'color', '#41d18f'), 250);
+        };
+        el.addEventListener('click', handler);
+      }
+    });
+
+    /* ---- Composant : planète cliquable (Observation + Interaction) ---- */
+    AFRAME.registerComponent('clickable-planet-init', { init: function(){} });
+
+    document.querySelectorAll('.planet.clickable').forEach(function (planet) {
+      planet.addEventListener('click', function () {
+        const name = planet.getAttribute('data-name');
+        const fact = planet.getAttribute('data-fact');
+        // Observation : marque la planète comme étudiée
+        learning.observed.add(name);
+        // Interaction : compte le geste
+        learning.interactions++;
+        refreshHUD();
+        // Affiche le panneau d'information devant le joueur
+        showInfo(name, fact);
+        // Retour visuel : la planète grossit brièvement
+        planet.setAttribute('animation__pulse',
+          'property: scale; from: 1 1 1; to: 1.18 1.18 1.18; dur: 180; dir: alternate; loop: 2');
+      });
+    });
+
+    function showInfo(title, body) {
+      const panel = document.getElementById('infoPanel');
+      document.getElementById('infoTitle').setAttribute('value', title);
+      document.getElementById('infoBody').setAttribute('value', body);
+      panel.setAttribute('visible', true);
+      // place le panneau devant la caméra
+      const cam = document.querySelector('a-camera');
+      const camPos = new THREE.Vector3();
+      cam.object3D.getWorldPosition(camPos);
+      panel.setAttribute('position', { x: camPos.x, y: 2.3, z: camPos.z - 3.2 });
+      clearTimeout(window.__infoTimer);
+      window.__infoTimer = setTimeout(() => panel.setAttribute('visible', false), 9000);
+    }
+
+    /* ---- Composant : quiz (Interaction évaluative) ---- */
+    const QUIZ = [
+      { q: "Quelle planète est la plus proche du Soleil ?", options: ["Mars", "Mercure", "La Terre"], answer: 1 },
+      { q: "Quelle est la planète la plus chaude ?", options: ["Vénus", "Jupiter", "Mercure"], answer: 0 },
+      { q: "Quelle planète abrite la vie ?", options: ["Mars", "La Terre", "Vénus"], answer: 1 },
+      { q: "Quelle est la planète rouge ?", options: ["Jupiter", "Mercure", "Mars"], answer: 2 },
+      { q: "Quelle est la plus grande planète ?", options: ["La Terre", "Jupiter", "Vénus"], answer: 1 }
+    ];
+
+    AFRAME.registerComponent('quiz-control', {
+      init: function () {
+        this.index = -1;
+        this.el.addEventListener('click', () => this.next());
+      },
+      next: function () {
+        const txt = document.getElementById('quizText');
+        if (this.index === -1) {
+          if (learning.observed.size < 5) {
+            txt.setAttribute('value', "Étudiez d'abord les 5 planètes.\n(" +
+              learning.observed.size + "/5 observées)");
+            return;
+          }
+          this.index = 0;
+          this.ask();
+          return;
+        }
+        // enregistre une réponse cyclique (démo) : ici on valide la bonne réponse
+        // pour montrer la mécanique d'évaluation ; en clic réel l'utilisateur choisit.
+        this.index++;
+        if (this.index >= QUIZ.length) {
+          txt.setAttribute('value', "QUIZ TERMINÉ\nScore : " + learning.quizScore + " / " + QUIZ.length +
+            "\nMerci d'avoir exploré !");
+          return;
+        }
+        this.ask();
+      },
+      ask: function () {
+        const item = QUIZ[this.index];
+        document.getElementById('quizText').setAttribute('value',
+          "Q" + (this.index + 1) + "/" + QUIZ.length + " : " + item.q +
+          "\n\nUtilisez les boutons réponses →");
+        this.renderOptions(item);
+      },
+      renderOptions: function (item) {
+        // crée 3 boutons de réponse temporaires devant le kiosque
+        const kiosk = document.getElementById('quizKiosk');
+        document.querySelectorAll('.answer-btn').forEach(b => b.parentNode.removeChild(b));
+        item.options.forEach((opt, i) => {
+          const btn = document.createElement('a-entity');
+          btn.classList.add('answer-btn', 'clickable');
+          btn.setAttribute('position', (-0.9 + i * 0.9) + ' 0.05 0.3');
+          btn.innerHTML =
+            '<a-box depth="0.12" height="0.28" width="0.8" material="color:#2f6fe0"></a-box>' +
+            '<a-text value="' + opt + '" align="center" position="0 0 0.1" width="1.6" color="#fff"></a-text>';
+          btn.addEventListener('click', () => {
+            if (i === item.answer) { learning.quizScore++; }
+            learning.interactions++;
+            refreshHUD();
+            this.next();
+          });
+          kiosk.appendChild(btn);
+        });
+      }
+    });
+
+    /* ---- Génération du champ d'étoiles ---- */
+    window.addEventListener('load', function () {
+      const sf = document.getElementById('starfield');
+      if (!sf) return;
+      for (let i = 0; i < 280; i++) {
+        const s = document.createElement('a-sphere');
+        const r = 30 + Math.random() * 20;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.random() * Math.PI;
+        s.setAttribute('radius', 0.05 + Math.random() * 0.08);
+        s.setAttribute('position', {
+          x: r * Math.sin(phi) * Math.cos(theta),
+          y: Math.abs(r * Math.cos(phi)) + 2,
+          z: r * Math.sin(phi) * Math.sin(theta)
+        });
+        s.setAttribute('material', 'color:#ffffff; emissive:#ffffff; emissiveIntensity:0.8; shader:flat');
+        sf.appendChild(s);
+      }
+      refreshHUD();
+    });
+  </script>
+</body>
+</html>
