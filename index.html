@@ -190,6 +190,9 @@
 
   <!-- ===================== LOGIQUE / COMPOSANTS A-FRAME ===================== -->
   <script>
+    /* Supprime les accents pour le texte 3D (police A-Frame par défaut sans glyphes accentués) */
+    function da(s){ return (s==null?'':String(s)).normalize('NFD').replace(new RegExp('[\\u0300-\\u036f]','g'),''); }
+
     /* État global d'apprentissage = base de l'analyse d'impact */
     const learning = {
       observed: new Set(),   // planètes réellement étudiées (Observation)
@@ -251,8 +254,8 @@
 
     function showInfo(title, body) {
       const panel = document.getElementById('infoPanel');
-      document.getElementById('infoTitle').setAttribute('value', title);
-      document.getElementById('infoBody').setAttribute('value', body);
+      document.getElementById('infoTitle').setAttribute('value', da(title));
+      document.getElementById('infoBody').setAttribute('value', da(body));
       panel.setAttribute('visible', true);
       // place le panneau devant la caméra
       const cam = document.querySelector('a-camera');
@@ -281,8 +284,8 @@
         const txt = document.getElementById('quizText');
         if (this.index === -1) {
           if (learning.observed.size < 5) {
-            txt.setAttribute('value', "Étudiez d'abord les 5 planètes.\n(" +
-              learning.observed.size + "/5 observées)");
+            txt.setAttribute('value', "Etudiez d'abord les 5 planetes.\n(" +
+              learning.observed.size + "/5 observees)");
             return;
           }
           this.index = 0;
@@ -293,8 +296,8 @@
         // pour montrer la mécanique d'évaluation ; en clic réel l'utilisateur choisit.
         this.index++;
         if (this.index >= QUIZ.length) {
-          txt.setAttribute('value', "QUIZ TERMINÉ\nScore : " + learning.quizScore + " / " + QUIZ.length +
-            "\nMerci d'avoir exploré !");
+          txt.setAttribute('value', "QUIZ TERMINE\nScore : " + learning.quizScore + " / " + QUIZ.length +
+            "\nMerci d'avoir explore !");
           return;
         }
         this.ask();
@@ -302,8 +305,8 @@
       ask: function () {
         const item = QUIZ[this.index];
         document.getElementById('quizText').setAttribute('value',
-          "Q" + (this.index + 1) + "/" + QUIZ.length + " : " + item.q +
-          "\n\nUtilisez les boutons réponses →");
+          "Q" + (this.index + 1) + "/" + QUIZ.length + " : " + da(item.q) +
+          "\n\nUtilisez les boutons reponses ->");
         this.renderOptions(item);
       },
       renderOptions: function (item) {
@@ -316,7 +319,7 @@
           btn.setAttribute('position', (-0.9 + i * 0.9) + ' 0.05 0.3');
           btn.innerHTML =
             '<a-box depth="0.12" height="0.28" width="0.8" material="color:#2f6fe0"></a-box>' +
-            '<a-text value="' + opt + '" align="center" position="0 0 0.1" width="1.6" color="#fff"></a-text>';
+            '<a-text value="' + da(opt) + '" align="center" position="0 0 0.1" width="1.6" color="#fff"></a-text>';
           btn.addEventListener('click', () => {
             if (i === item.answer) { learning.quizScore++; }
             learning.interactions++;
@@ -346,6 +349,11 @@
         s.setAttribute('material', 'color:#ffffff; emissive:#ffffff; emissiveIntensity:0.8; shader:flat');
         sf.appendChild(s);
       }
+      // Corrige les libellés 3D statiques (accents non rendus par la police par défaut)
+      document.querySelectorAll('a-text').forEach(function (t) {
+        var v = t.getAttribute('value');
+        if (v) { t.setAttribute('value', da(v)); }
+      });
       refreshHUD();
     });
   </script>
